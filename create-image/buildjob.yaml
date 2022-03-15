@@ -1,0 +1,171 @@
+apiVersion: v1
+data:
+  config: |-
+    #cloud-config
+    rancheros:
+      install:
+        automatic: false
+  grub.cfg: |-
+    search --file --set=root /boot/kernel.xz
+    set default=0
+    set timeout=10
+    set timeout_style=menu
+    set linux=linux
+    set initrd=initrd
+    if [ "${grub_cpu}" = "x86_64" -o "${grub_cpu}" = "i386" -o "${grub_cpu}" = "arm64" ];then
+        if [ "${grub_platform}" = "efi" ]; then
+            if [ "${grub_cpu}" != "arm64" ]; then
+                set linux=linuxefi
+                set initrd=initrdefi
+            fi
+        fi
+    fi
+    if [ "${grub_platform}" = "efi" ]; then
+        echo "Please press t to show the boot menu on this console"
+    fi
+    set font=($root)/boot/${grub_cpu}/loader/grub2/fonts/unicode.pf2
+    if [ -f ${font} ];then
+        loadfont ${font}
+    fi
+    menuentry "RancherOS Install" --class os --unrestricted {
+        echo Loading kernel...
+        $linux ($root)/boot/kernel.xz cdroot root=live:CDLABEL=COS_LIVE rd.live.dir=/ rd.live.squashimg=rootfs.squashfs console=tty1 console=ttyS0 rd.cos.disable rancheros.install.automatic=true rancheros.install.config_url=/run/initramfs/live/config
+        echo Loading initrd...
+        $initrd ($root)/boot/rootfs.xz
+    }
+
+    if [ "${grub_platform}" = "efi" ]; then
+        hiddenentry "Text mode" --hotkey "t" {
+            set textmode=true
+            terminal_output console
+        }
+    fi
+  iso.yaml: |-
+    packages:
+      uefi:
+      - live/grub2-efi-image
+      isoimage:
+      - live/grub2
+      - live/grub2-efi-image
+
+    boot_file: "boot/x86_64/loader/eltorito.img"
+    boot_catalog: "boot/x86_64/boot.catalog"
+    isohybrid_mbr: "boot/x86_64/loader/boot_hybrid.img"
+
+    initramfs:
+      kernel_file: "vmlinuz"
+      rootfs_file: "initrd"
+
+    overlay:
+      isoimage: /iso/iso-overlay
+    rootfs_image: "ghcr.io/rancher-sandbox/ros-update-image:latest"
+    image_prefix: "output"
+    label: "COS_LIVE"
+
+    squashfs_options:
+      compression: xz
+
+    luet:
+      repositories:
+      - name: "cos-toolkit-green-amd64"
+        type: "docker"
+        enable: true
+        arch: amd64
+        urls:
+        - "quay.io/costoolkit/releases-green"
+      - name: "cos-toolkit-green-arm64"
+        type: "docker"
+        enable: true
+        arch: arm64
+        urls:
+        - "quay.io/costoolkit/releases-green-arm64"
+  luet.yaml: |-
+    logging:
+      color: false
+      enable_emoji: false
+    general:
+       debug: false
+       spinner_charset: 9
+    repositories:
+    - name: "cos-toolkit-green-amd64"
+      type: "docker"
+      enable: true
+      arch: amd64
+      urls:
+      - "quay.io/costoolkit/releases-green"
+    - name: "cos-toolkit-green"
+      type: "docker"
+      enable: true
+      arch: arm64
+      urls:
+      - "quay.io/costoolkit/releases-green-arm64"
+kind: ConfigMap
+metadata:
+  name: elemental-build-config
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+ name: build-host-iso
+spec:
+ selector:
+    matchLabels:
+      app: build-host-iso
+ replicas: 1
+ template:
+  metadata:
+    labels: 
+      app: build-host-iso
+  spec:
+   initContainers:
+    - name: build-iso
+      image: registry.opensuse.org/home/kwk/elemental/images/opensuse_leap_15.3/rancher/ros-builder-image-opensuse/15.3
+      volumeMounts:
+       - name: rootfs
+         mountPath: /iso/overlay
+       - name: public
+         mountPath: /mnt/public/
+       - name: tmp
+         mountPath: /tmp/ 
+       - name: iso-yaml
+         mountPath: /iso/iso.yaml
+         subPath: iso.yaml
+       - name: grub-cfg
+         mountPath: /iso/iso-overlay/boot/grub2/grub.cfg
+         subPath: grub.cfg
+       - name: config
+         mountPath: /iso/iso-overlay/config
+         subPath: config
+      workingDir: /iso/
+      command: ["/bin/bash"]
+      args:
+       - -c
+       - luet-makeiso iso.yaml; cp output.iso /mnt/public/
+
+
+
+   containers:
+    - name: host
+      image: nginx
+      ports:
+      - containerPort: 80
+      volumeMounts:
+       - name: public
+         mountPath: /usr/share/nginx/html
+   volumes:
+    - name: tmp
+      emptyDir: {}
+    - name: rootfs
+      emptyDir: {}
+    - name: public
+      emptyDir: {}
+    - name: iso-yaml
+      configMap:
+       name: elemental-build-config
+    - name: grub-cfg
+      configMap:
+       name: elemental-build-config
+    - name: config
+      configMap:
+       name: elemental-build-config

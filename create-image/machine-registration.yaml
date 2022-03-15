@@ -1,0 +1,11 @@
+kind: MachineRegistration
+apiVersion: rancheros.cattle.io/v1
+metadata:
+  name: default
+spec:
+  cloudConfig:
+    install:
+      device: /dev/nvme0n1
+    users:
+    - name: root
+      passwd: root

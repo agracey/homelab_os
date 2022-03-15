@@ -1,25 +1,21 @@
-FROM quay.io/costoolkit/os2:v0.1.0-alpha17-amd64
-RUN zypper in -y xinit xhost accountsservice xorg-x11 xorg-x11-server \
-    branding-openSUSE \
-    lxde-common-branding-openSUSE lxde-common \
-    patterns-lxde-lxde \
-    ;zypper clean -a
-RUN systemctl set-default graphical
+ARG base_image=quay.io/costoolkit/os2:v0.1.0-alpha19-amd64
+FROM ${base_image}
 
+# Install needed packages for minimal desktop environment.
+# Running w/o DE resulted in errors
 RUN zypper in -y xinit xhost accountsservice xorg-x11 xorg-x11-server \
-lxappearance lxappearance-lang lxappearance-obconf \
-lxde-common lxde-common-branding-openSUSE lxinput lxmenu-data \
+lxde-common lxde-common-branding-openSUSE \
 lxpanel lxpanel-lang lxrandr \
-lxsession \
-lxterminal-lang nuoveXT2-icon-theme \
-obconf openbox; zypper clean -a
+lxsession openbox; \
+zypper clean -a
 
-COPY xinitrc /root/.xinitrc
-COPY bash_profile /root/.bash_profile
-COPY autologin.conf /usr/lib/systemd/system/getty@tty1.service.d/autologin.conf
 
+# Auto login to lxde as "user"
 RUN useradd -m user
 COPY xinitrc /home/user/.xinitrc
 COPY bash_profile /home/user/.bash_profile
+COPY autologin.conf /usr/lib/systemd/system/getty@tty1.service.d/90-autologin.conf
+
+# Set runlevel to multi-user so startx can be run by above scripts
 RUN systemctl disable display-manager
 RUN systemctl set-default multi-user
