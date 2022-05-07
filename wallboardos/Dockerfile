@@ -1,4 +1,4 @@
-ARG base_image=quay.io/costoolkit/os2:v0.1.0-alpha19-amd64
+ARG base_image=quay.io/costoolkit/os2:v0.1.0-amd64
 FROM ${base_image}
 
 # Install needed packages for minimal desktop environment.
