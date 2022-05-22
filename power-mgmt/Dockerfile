@@ -1,6 +1,6 @@
 FROM registry.suse.com/bci/nodejs
 
-RUN zypper in make gcc python39
+RUN zypper -n in make gcc python39 iputils wol
 
 COPY . .
 
