@@ -1,0 +1,17 @@
+{
+  "name": "power-mgmt",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.18.1",
+    "node-ssh": "^12.0.4",
+    "node-wol": "^0.1.1",
+    "wake_on_lan": "^1.0.0"
+  }
+}
